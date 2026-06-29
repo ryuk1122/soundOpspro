@@ -18,6 +18,12 @@ Ver guia completa en [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 El backend usa FastAPI, Firebase Firestore y Cloudinary. La nube configurada para imagenes es `dl2m6strc`.
 
+Para prender el backend local antes de abrir la APK:
+
+```powershell
+.\START_SOUNDOPS_BACKEND.bat
+```
+
 ```powershell
 cd backend
 python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
