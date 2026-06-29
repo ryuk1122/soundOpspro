@@ -26,6 +26,12 @@ git push -u origin main
 
 ## 2. Railway backend
 
+Produccion actual:
+
+```text
+https://api-production-45a2.up.railway.app
+```
+
 Crear un servicio desde GitHub y configurar:
 
 - Root directory: `backend`
@@ -121,4 +127,3 @@ npm run build:android:preview
 ```
 
 EAS genera un enlace de descarga interno para instalar el APK directamente en Android.
-

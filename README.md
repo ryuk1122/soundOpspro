@@ -14,6 +14,12 @@ Proyecto preparado para:
 
 Ver guia completa en [DEPLOYMENT.md](./DEPLOYMENT.md).
 
+Backend en produccion:
+
+```text
+https://api-production-45a2.up.railway.app/api/health
+```
+
 ## Backend
 
 El backend usa FastAPI, Firebase Firestore y Cloudinary. La nube configurada para imagenes es `dl2m6strc`.
