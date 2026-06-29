@@ -32,7 +32,11 @@ def required_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
+    return value.strip().strip('"').strip("'")
+
+
+def optional_env(name: str, default: str) -> str:
+    return os.environ.get(name, default).strip().strip('"').strip("'")
 
 # ---------------------------------------------------------------------------
 # Firebase Firestore init
@@ -40,15 +44,15 @@ def required_env(name: str) -> str:
 # ---------------------------------------------------------------------------
 _fb_json_str = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 _fb_json_b64 = os.environ.get("FIREBASE_CREDENTIALS_B64")
-_fb_cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", "firebase_credentials.json")
+_fb_cred_path = optional_env("FIREBASE_CREDENTIALS_PATH", "firebase_credentials.json")
 
 if _fb_json_b64:
     # Railway-friendly: service account JSON encoded as Base64.
-    cred_dict = json.loads(base64.b64decode(_fb_json_b64).decode("utf-8"))
+    cred_dict = json.loads(base64.b64decode(_fb_json_b64.strip().strip('"').strip("'")).decode("utf-8"))
     cred = credentials.Certificate(cred_dict)
 elif _fb_json_str:
     # Railway: credentials as a raw JSON environment variable.
-    cred_dict = json.loads(_fb_json_str)
+    cred_dict = json.loads(_fb_json_str.strip().strip("'"))
     cred = credentials.Certificate(cred_dict)
 else:
     # Local: archivo firebase_credentials.json relativo a backend/
@@ -77,11 +81,11 @@ cloudinary.config(
 # JWT / App config
 # ---------------------------------------------------------------------------
 JWT_SECRET = required_env("JWT_SECRET")
-JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
+JWT_ALGORITHM = optional_env("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(optional_env("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 CORS_ORIGINS = [
     origin.strip()
-    for origin in os.environ.get("CORS_ORIGINS", "*").split(",")
+    for origin in optional_env("CORS_ORIGINS", "*").split(",")
     if origin.strip()
 ]
 
