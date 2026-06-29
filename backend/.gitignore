@@ -1,0 +1,17 @@
+# Credenciales - NUNCA subir a GitHub
+.env
+env
+firebase_credentials*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
