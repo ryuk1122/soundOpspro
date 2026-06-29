@@ -18,20 +18,39 @@ export default function EquipmentDetail() {
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    try { const data = await api<any>(`/equipment/${id}`); setItem(data); } catch {} finally { setLoading(false); }
+    setError("");
+    try {
+      const data = await api<any>(`/equipment/${id}`, { timeoutMs: 45000 });
+      setItem(data);
+    } catch (e: any) {
+      setError(e?.message || "Equipment could not load.");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const remove = async () => {
     setDeleting(true);
     try { await api(`/equipment/${id}`, { method: "DELETE" }); router.back(); }
-    catch { setDeleting(false); setConfirm(false); }
+    catch (e: any) { setError(e?.message || "Could not delete equipment."); setDeleting(false); setConfirm(false); }
   };
 
-  if (loading || !item) {
+  if (loading) {
     return <View style={styles.loader}><ActivityIndicator color={colors.brand} size="large" /></View>;
+  }
+
+  if (!item) {
+    return (
+      <View style={[styles.loader, { paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.errorTitle}>Equipment unavailable</Text>
+        <Text style={styles.errorText}>{error || "Could not load this equipment."}</Text>
+        <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(); }} />
+      </View>
+    );
   }
 
   const cond = CONDITIONS.find((c) => c.key === item.condition) ?? CONDITIONS[0];
@@ -63,6 +82,7 @@ export default function EquipmentDetail() {
         <View style={styles.body}>
           <Text style={styles.brand}>{item.brand || item.category}</Text>
           <Text style={styles.name}>{item.name}</Text>
+          {error ? <Text style={styles.inlineError}>{error}</Text> : null}
           <View style={{ flexDirection: "row", marginTop: spacing.sm }}><Badge label={cond.label} color={cond.color} /></View>
 
           <View style={styles.specGrid}>
@@ -123,4 +143,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontFamily: fonts.displaySemi, fontSize: 20, color: colors.onSurface },
   modalText: { fontFamily: fonts.text, fontSize: 14, color: colors.onSurfaceSecondary, marginTop: spacing.sm, marginBottom: spacing.lg },
   modalActions: { flexDirection: "row", gap: spacing.md },
+  errorTitle: { fontFamily: fonts.displaySemi, color: colors.onSurface, fontSize: 20, marginBottom: spacing.sm },
+  errorText: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 14, textAlign: "center", marginBottom: spacing.lg },
+  inlineError: { fontFamily: fonts.textMedium, color: colors.error, fontSize: 13, marginTop: spacing.sm },
 });

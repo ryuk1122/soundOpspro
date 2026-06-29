@@ -13,6 +13,9 @@ export const colors = {
   onBrand: "#000000",
   brandSecondary: "#CC7F08",
   brandTertiary: "rgba(255, 159, 10, 0.12)",
+  accent: "#2DD4BF",
+  accentTertiary: "rgba(45, 212, 191, 0.14)",
+  info: "#38BDF8",
   success: "#34C759",
   warning: "#FFD60A",
   error: "#FF453A",
@@ -26,13 +29,13 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48
 export const radius = { sm: 6, md: 12, lg: 20, pill: 999 };
 
 export const fonts = {
-  display: "Rajdhani",
-  displayMedium: "Rajdhani-Medium",
-  displaySemi: "Rajdhani-SemiBold",
-  displayBold: "Rajdhani-Bold",
-  text: "IBMPlexSans",
-  textMedium: "IBMPlexSans-Medium",
-  textSemi: "IBMPlexSans-SemiBold",
+  display: "Inter",
+  displayMedium: "Inter-Medium",
+  displaySemi: "Inter-SemiBold",
+  displayBold: "Inter-Bold",
+  text: "Inter",
+  textMedium: "Inter-Medium",
+  textSemi: "Inter-SemiBold",
 };
 
 export const CATEGORIES = [

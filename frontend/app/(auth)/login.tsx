@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
@@ -13,13 +13,17 @@ import { useAuth } from "@/src/lib/auth";
 import { colors, fonts, images, spacing } from "@/src/lib/theme";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, user, ready } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (ready && user) router.replace("/(tabs)");
+  }, [ready, router, user]);
 
   const submit = async () => {
     setError("");
@@ -54,7 +58,14 @@ export default function Login() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Command Center</Text>
-          <Text style={styles.subtitle}>Sign in to manage your audio fleet.</Text>
+          <Text style={styles.subtitle}>Control inventory, event deployments and returns from one workspace.</Text>
+
+          <View style={styles.liveRow}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>Railway API online</Text>
+            <Text style={styles.liveDivider}>/</Text>
+            <Text style={styles.liveText}>Firebase synced</Text>
+          </View>
 
           <TextField testID="login-email-input" label="Email" value={email} onChangeText={setEmail}
             autoCapitalize="none" keyboardType="email-address" placeholder="you@studio.com" />
@@ -86,6 +97,21 @@ const styles = StyleSheet.create({
   form: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
   title: { fontFamily: fonts.displayBold, fontSize: 32, color: colors.onSurface },
   subtitle: { fontFamily: fonts.text, fontSize: 15, color: colors.onSurfaceSecondary, marginBottom: spacing.xl },
+  liveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success, marginRight: spacing.sm },
+  liveText: { fontFamily: fonts.textMedium, color: colors.onSurfaceSecondary, fontSize: 12 },
+  liveDivider: { color: colors.onSurfaceTertiary, marginHorizontal: spacing.sm },
   error: { color: colors.error, fontFamily: fonts.textMedium, fontSize: 13, marginBottom: spacing.md },
   switchRow: { marginTop: spacing.xl, alignItems: "center" },
   switchText: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 14 },

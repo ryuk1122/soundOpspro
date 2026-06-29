@@ -41,41 +41,83 @@ export default function EventDetail() {
   const [assignQty, setAssignQty] = useState(1);
   const [returnTarget, setReturnTarget] = useState<Assignment | null>(null);
   const [returnQty, setReturnQty] = useState(1);
+  const [error, setError] = useState("");
+  const [sheetError, setSheetError] = useState("");
 
   const load = useCallback(async () => {
-    try { const data = await api<EventT>(`/events/${id}`); setEvent(data); } catch {} finally { setLoading(false); }
+    setError("");
+    try {
+      const data = await api<EventT>(`/events/${id}`, { timeoutMs: 45000 });
+      setEvent(data);
+    } catch (e: any) {
+      setError(e?.message || "Event could not load.");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const openAssign = async () => {
-    setPicked(null); setAssignQty(1);
-    try { const items = await api<Item[]>("/equipment?limit=50"); setAvailable(items.filter((i) => i.quantity_available > 0)); }
-    catch { setAvailable([]); }
+    setPicked(null); setAssignQty(1); setSheetError("");
+    try {
+      const items = await api<Item[]>("/equipment?limit=50", { forceRefresh: true, timeoutMs: 45000 });
+      setAvailable(items.filter((i) => i.quantity_available > 0));
+    }
+    catch (e: any) {
+      setAvailable([]);
+      setSheetError(e?.message || "Could not load available equipment.");
+    }
     setAssignOpen(true);
   };
 
   const doAssign = async () => {
     if (!picked) return;
     setBusy(true);
-    try { const updated = await api<EventT>(`/events/${id}/assign`, { method: "POST", body: { equipment_id: picked.id, quantity: assignQty } }); setEvent(updated); setAssignOpen(false); }
-    catch {} finally { setBusy(false); }
+    setSheetError("");
+    try {
+      const updated = await api<EventT>(`/events/${id}/assign`, { method: "POST", body: { equipment_id: picked.id, quantity: assignQty }, timeoutMs: 45000 });
+      setEvent(updated);
+      setAssignOpen(false);
+    }
+    catch (e: any) { setSheetError(e?.message || "Could not assign equipment."); }
+    finally { setBusy(false); }
   };
 
   const doReturn = async () => {
     if (!returnTarget) return;
     setBusy(true);
-    try { const updated = await api<EventT>(`/events/${id}/return`, { method: "POST", body: { equipment_id: returnTarget.equipment_id, quantity: returnQty } }); setEvent(updated); setReturnTarget(null); }
-    catch {} finally { setBusy(false); }
+    setSheetError("");
+    try {
+      const updated = await api<EventT>(`/events/${id}/return`, { method: "POST", body: { equipment_id: returnTarget.equipment_id, quantity: returnQty }, timeoutMs: 45000 });
+      setEvent(updated);
+      setReturnTarget(null);
+    }
+    catch (e: any) { setSheetError(e?.message || "Could not return equipment."); }
+    finally { setBusy(false); }
   };
 
   const setStatus = async (status: string) => {
     setBusy(true);
-    try { const updated = await api<EventT>(`/events/${id}/status`, { method: "PATCH", body: { status } }); setEvent(updated); }
-    catch {} finally { setBusy(false); }
+    setError("");
+    try {
+      const updated = await api<EventT>(`/events/${id}/status`, { method: "PATCH", body: { status }, timeoutMs: 45000 });
+      setEvent(updated);
+    }
+    catch (e: any) { setError(e?.message || "Could not update status."); }
+    finally { setBusy(false); }
   };
 
-  if (loading || !event) {
+  if (loading) {
     return <View style={styles.loader}><ActivityIndicator color={colors.brand} size="large" /></View>;
+  }
+
+  if (!event) {
+    return (
+      <View style={[styles.loader, { paddingHorizontal: spacing.lg }]}>
+        <EmptyState icon="cloud-offline-outline" title="Event unavailable" subtitle={error || "Could not load this event."} />
+        <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(); }} />
+      </View>
+    );
   }
 
   const total = event.assignments.reduce((s, a) => s + a.quantity, 0);
@@ -93,6 +135,12 @@ export default function EventDetail() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 160 }}>
         <Text style={styles.title}>{event.name}</Text>
+        {error ? (
+          <View style={styles.inlineError}>
+            <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+            <Text style={styles.inlineErrorText}>{error}</Text>
+          </View>
+        ) : null}
         <View style={styles.metaRow}>
           <Ionicons name="location-outline" size={15} color={colors.onSurfaceTertiary} />
           <Text style={styles.metaText}>{event.venue || "No venue"}</Text>
@@ -133,7 +181,7 @@ export default function EventDetail() {
                 {done ? (
                   <View style={styles.doneTag}><Ionicons name="checkmark-circle" size={18} color={colors.success} /></View>
                 ) : (
-                  <Pressable testID={`return-${a.equipment_id}`} onPress={() => { setReturnTarget(a); setReturnQty(outstanding); }} style={styles.returnBtn}>
+                  <Pressable testID={`return-${a.equipment_id}`} onPress={() => { setSheetError(""); setReturnTarget(a); setReturnQty(outstanding); }} style={styles.returnBtn}>
                     <Ionicons name="arrow-down" size={15} color={colors.brand} />
                     <Text style={styles.returnText}>Return</Text>
                   </Pressable>
@@ -159,7 +207,7 @@ export default function EventDetail() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Assign Gear</Text>
             {available.length === 0 ? (
-              <Text style={styles.muted}>No available units. Add stock or return deployed gear first.</Text>
+              <Text style={styles.muted}>{sheetError || "No available units. Add stock or return deployed gear first."}</Text>
             ) : (
               <FlatList
                 data={available} keyExtractor={(i) => i.id} style={{ maxHeight: 240 }}
@@ -181,6 +229,7 @@ export default function EventDetail() {
                 <Stepper value={assignQty} min={1} max={picked.quantity_available} onChange={setAssignQty} />
               </View>
             )}
+            {sheetError && available.length > 0 ? <Text style={styles.sheetError}>{sheetError}</Text> : null}
             <View style={styles.sheetActions}>
               <Button testID="cancel-assign" title="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => setAssignOpen(false)} />
               <Button testID="confirm-assign" title="Assign" disabled={!picked} loading={busy} style={{ flex: 1 }} onPress={doAssign} />
@@ -198,6 +247,7 @@ export default function EventDetail() {
               <Text style={styles.qtyLabel}>Units to return</Text>
               <Stepper value={returnQty} min={1} max={returnTarget ? returnTarget.quantity - returnTarget.returned : 1} onChange={setReturnQty} />
             </View>
+            {sheetError ? <Text style={styles.sheetError}>{sheetError}</Text> : null}
             <View style={styles.sheetActions}>
               <Button testID="cancel-return" title="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => setReturnTarget(null)} />
               <Button testID="confirm-return" title="Confirm Return" loading={busy} style={{ flex: 1 }} onPress={doReturn} />
@@ -237,6 +287,9 @@ const styles = StyleSheet.create({
   statusChip: { flex: 1, alignItems: "center", paddingVertical: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSecondary },
   statusChipText: { fontFamily: fonts.textMedium, fontSize: 13, color: colors.onSurfaceSecondary, textTransform: "capitalize" },
   muted: { fontFamily: fonts.text, color: colors.onSurfaceTertiary, fontSize: 14, paddingVertical: spacing.md },
+  inlineError: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,69,58,0.12)", borderWidth: 1, borderColor: "rgba(255,69,58,0.35)", borderRadius: radius.sm, padding: spacing.md, marginTop: spacing.md },
+  inlineErrorText: { flex: 1, marginLeft: spacing.sm, fontFamily: fonts.textMedium, color: colors.error, fontSize: 13 },
+  sheetError: { fontFamily: fonts.textMedium, color: colors.error, fontSize: 13, marginBottom: spacing.md },
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.surfaceSecondary, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, borderTopWidth: 1, borderColor: colors.border },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center", marginBottom: spacing.lg },

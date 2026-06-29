@@ -31,11 +31,16 @@ export default function EquipmentForm() {
     if (!editing) return;
     (async () => {
       try {
+        // Item individual: no cacheamos (cacheMs default 0), siempre fresco.
         const item = await api<any>(`/equipment/${id}`);
         setName(item.name); setBrand(item.brand || ""); setCategory(item.category);
         setCondition(item.condition); setQuantity(String(item.quantity));
         setNotes(item.notes || ""); setImage(item.image || null);
-      } catch {}
+      } catch (e: any) {
+        // FIX Bug 1 (diagnostico previo): el catch ahora muestra el error
+        // real al usuario en vez de tragarselo en silencio.
+        setError(e?.message || "No se pudo cargar el equipo");
+      }
     })();
   }, [editing, id]);
 
@@ -58,6 +63,7 @@ export default function EquipmentForm() {
   };
 
   const save = async () => {
+    if (loading) return;
     setError("");
     if (!name.trim()) { setError("Equipment name is required"); return; }
     const qty = parseInt(quantity, 10);
@@ -65,10 +71,16 @@ export default function EquipmentForm() {
     setLoading(true);
     const body = { name: name.trim(), brand: brand.trim(), category, condition, quantity: qty, notes: notes.trim(), image };
     try {
-      if (editing) await api(`/equipment/${id}`, { method: "PUT", body });
-      else await api("/equipment", { method: "POST", body });
+      // Endpoint correcto: /equipment (no /events). api.ts invalida la cache
+      // de "/equipment" automaticamente tras este POST/PUT.
+      if (editing) await api(`/equipment/${id}`, { method: "PUT", body, timeoutMs: 90000 });
+      else await api("/equipment", { method: "POST", body, timeoutMs: 90000 });
       router.back();
-    } catch (e: any) { setError(e.message || "Failed to save"); } finally { setLoading(false); }
+    } catch (e: any) {
+      setError(e?.message || "Failed to save");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

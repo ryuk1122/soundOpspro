@@ -8,9 +8,11 @@ import logging
 import uuid
 import json
 import base64
+import asyncio
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import BaseModel, Field, EmailStr
 from passlib.context import CryptContext
@@ -27,6 +29,8 @@ import cloudinary.uploader
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
+_executor = ThreadPoolExecutor(max_workers=8)
+
 
 def required_env(name: str) -> str:
     value = os.environ.get(name)
@@ -40,22 +44,18 @@ def optional_env(name: str, default: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Firebase Firestore init
-# Soporta credenciales como JSON string (Railway) o archivo local
 # ---------------------------------------------------------------------------
 _fb_json_str = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 _fb_json_b64 = os.environ.get("FIREBASE_CREDENTIALS_B64")
 _fb_cred_path = optional_env("FIREBASE_CREDENTIALS_PATH", "firebase_credentials.json")
 
 if _fb_json_b64:
-    # Railway-friendly: service account JSON encoded as Base64.
     cred_dict = json.loads(base64.b64decode(_fb_json_b64.strip().strip('"').strip("'")).decode("utf-8"))
     cred = credentials.Certificate(cred_dict)
 elif _fb_json_str:
-    # Railway: credentials as a raw JSON environment variable.
     cred_dict = json.loads(_fb_json_str.strip().strip("'"))
     cred = credentials.Certificate(cred_dict)
 else:
-    # Local: archivo firebase_credentials.json relativo a backend/
     cred_path = Path(_fb_cred_path)
     if not cred_path.is_absolute():
         cred_path = ROOT_DIR / cred_path
@@ -140,6 +140,21 @@ def fs_doc_to_dict(doc) -> dict:
 
 def fs_query_to_list(query) -> list:
     return [doc.to_dict() for doc in query.stream()]
+
+
+def sort_created_desc(rows: list) -> list:
+    fallback = datetime.min.replace(tzinfo=timezone.utc)
+    return sorted(rows, key=lambda row: row.get("created_at") or fallback, reverse=True)
+
+
+# ✅ Helper para correr queries Firestore en paralelo desde async
+async def fs_parallel(*queries):
+    """Ejecuta múltiples queries Firestore en paralelo usando un thread pool."""
+    loop = asyncio.get_event_loop()
+    results = await asyncio.gather(
+        *[loop.run_in_executor(_executor, lambda q=q: fs_query_to_list(q), ) for q in queries]
+    )
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -322,12 +337,13 @@ async def list_equipment(
     user: dict = Depends(get_current_user),
 ):
     query = db.collection("equipment").where("owner_id", "==", user["id"])
+    docs = fs_query_to_list(query)
     if category and category != "All":
-        query = query.where("category", "==", category)
-    docs = fs_query_to_list(query.order_by("created_at", direction=firestore.Query.DESCENDING))
+        docs = [d for d in docs if d.get("category") == category]
     if q:
         q_lower = q.lower()
         docs = [d for d in docs if q_lower in d.get("name", "").lower()]
+    docs = sort_created_desc(docs)
     docs = docs[skip: skip + min(limit, 50)]
     return [Equipment(**d) for d in docs]
 
@@ -389,9 +405,10 @@ async def delete_equipment(item_id: str, user: dict = Depends(get_current_user))
 @api_router.get("/events", response_model=List[Event])
 async def list_events(status: Optional[str] = None, user: dict = Depends(get_current_user)):
     query = db.collection("events").where("owner_id", "==", user["id"])
+    docs = fs_query_to_list(query)
     if status:
-        query = query.where("status", "==", status)
-    docs = fs_query_to_list(query.order_by("created_at", direction=firestore.Query.DESCENDING))
+        docs = [d for d in docs if d.get("status") == status]
+    docs = sort_created_desc(docs)
     return [Event(**d) for d in docs]
 
 
@@ -503,28 +520,45 @@ async def return_gear(event_id: str, body: AssignIn, user: dict = Depends(get_cu
 
 
 # ---------------------------------------------------------------------------
-# Dashboard
+# Dashboard — ✅ FIX: queries en paralelo (era ~5x más lento en serie)
 # ---------------------------------------------------------------------------
 @api_router.get("/dashboard/stats")
 async def dashboard_stats(user: dict = Depends(get_current_user)):
-    equipment = fs_query_to_list(db.collection("equipment").where("owner_id", "==", user["id"]))
+    uid = user["id"]
+    loop = asyncio.get_event_loop()
+
+    # Lanzar las 3 queries principales en paralelo
+    def _get_equipment():
+        return fs_query_to_list(db.collection("equipment").where("owner_id", "==", uid))
+
+    def _get_events():
+        return fs_query_to_list(db.collection("events").where("owner_id", "==", uid))
+
+    def _get_movements():
+        rows = fs_query_to_list(db.collection("movements").where("owner_id", "==", uid))
+        return sort_created_desc(rows)[:8]
+
+    equipment, all_events, recent = await asyncio.gather(
+        loop.run_in_executor(_executor, _get_equipment),
+        loop.run_in_executor(_executor, _get_events),
+        loop.run_in_executor(_executor, _get_movements),
+    )
+
     total_gear = len(equipment)
     total_units = sum(e.get("quantity", 0) for e in equipment)
     available_units = sum(e.get("quantity_available", 0) for e in equipment)
     deployed_units = total_units - available_units
     stock_alerts = [
-        {"id": e["id"], "name": e["name"], "reason": "Out of stock" if e.get("quantity_available", 0) == 0 else "Needs service"}
+        {
+            "id": e["id"],
+            "name": e["name"],
+            "reason": "Out of stock" if e.get("quantity_available", 0) == 0 else "Needs service",
+        }
         for e in equipment
         if e.get("quantity_available", 0) == 0 or e.get("condition") != "operational"
     ]
-    all_events = fs_query_to_list(db.collection("events").where("owner_id", "==", user["id"]))
     active_events = sum(1 for e in all_events if e.get("status") != "completed")
-    recent = fs_query_to_list(
-        db.collection("movements")
-        .where("owner_id", "==", user["id"])
-        .order_by("created_at", direction=firestore.Query.DESCENDING)
-        .limit(8)
-    )
+
     return {
         "total_gear": total_gear,
         "total_units": total_units,
@@ -575,6 +609,14 @@ async def calc_amp_power(body: AmpPowerIn, user: dict = Depends(get_current_user
         "range_max": round(recommended, 1),
         "note": f"Allow ~{body.headroom_db} dB headroom above the speaker's continuous rating.",
     }
+
+
+# ---------------------------------------------------------------------------
+# ✅ NUEVO: Ping endpoint para mantener Railway caliente (evita cold starts)
+# ---------------------------------------------------------------------------
+@api_router.get("/ping")
+async def ping():
+    return {"pong": True}
 
 
 # ---------------------------------------------------------------------------

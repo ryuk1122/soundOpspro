@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,19 +23,31 @@ export default function Inventory() {
   const [items, setItems] = useState<Item[]>([]);
   const [category, setCategory] = useState("All");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState("");
 
-  const fetchPage = useCallback(async (cat: string, skip: number, replace: boolean) => {
+  const fetchPage = useCallback(async (cat: string, skip: number, replace: boolean, forceRefresh = false) => {
     const q = cat === "All" ? "" : `&category=${encodeURIComponent(cat)}`;
-    const data = await api<Item[]>(`/equipment?skip=${skip}&limit=${PAGE}${q}`);
+    const data = await api<Item[]>(`/equipment?skip=${skip}&limit=${PAGE}${q}`, { forceRefresh, timeoutMs: 45000 });
     setHasMore(data.length === PAGE);
     setItems((prev) => (replace ? data : [...prev, ...data]));
   }, []);
 
-  const loadInitial = useCallback(async (cat: string) => {
+  const loadInitial = useCallback(async (cat: string, forceRefresh = false) => {
     setLoading(true);
-    try { await fetchPage(cat, 0, true); } catch {} finally { setLoading(false); }
+    setError("");
+    try {
+      await fetchPage(cat, 0, true, forceRefresh);
+    } catch (e: any) {
+      setError(e?.message || "Inventory could not load.");
+      setItems([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [fetchPage]);
 
   useFocusEffect(useCallback(() => { loadInitial(category); }, [category, loadInitial]));
@@ -43,7 +55,7 @@ export default function Inventory() {
   const loadMore = async () => {
     if (loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
-    try { await fetchPage(category, items.length, false); } catch {} finally { setLoadingMore(false); }
+    try { await fetchPage(category, items.length, false); } catch (e: any) { setError(e?.message || "Could not load more equipment."); } finally { setLoadingMore(false); }
   };
 
   const renderItem = ({ item }: { item: Item }) => {
@@ -91,7 +103,17 @@ export default function Inventory() {
           data={items} keyExtractor={(i) => i.id} renderItem={renderItem}
           contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}
           onEndReached={loadMore} onEndReachedThreshold={0.4}
-          ListEmptyComponent={<EmptyState icon="mic-outline" title="Inventory is empty" subtitle="Add your first piece of gear to start tracking stock and deployments." />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadInitial(category, true); }} tintColor={colors.brand} />}
+          ListEmptyComponent={
+            error ? (
+              <View style={styles.errorState}>
+                <EmptyState icon="cloud-offline-outline" title="Inventory unavailable" subtitle={error} />
+                <Button title="Retry" icon="refresh" variant="secondary" onPress={() => loadInitial(category, true)} />
+              </View>
+            ) : (
+              <EmptyState icon="mic-outline" title="Inventory is empty" subtitle="Add your first piece of gear to start tracking stock and deployments." />
+            )
+          }
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.lg }} /> : null}
         />
       )}
@@ -120,4 +142,5 @@ const styles = StyleSheet.create({
   stockNum: { fontFamily: fonts.displayBold, fontSize: 24 },
   stockLabel: { fontFamily: fonts.text, fontSize: 11, color: colors.onSurfaceTertiary },
   cta: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
+  errorState: { paddingHorizontal: spacing.lg },
 });

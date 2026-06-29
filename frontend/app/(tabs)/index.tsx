@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/lib/api";
+import { Button } from "@/src/components/ui";
 import { useAuth } from "@/src/lib/auth";
 import { colors, fonts, images, radius, spacing } from "@/src/lib/theme";
 
@@ -26,12 +27,16 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = false) => {
+    setError("");
     try {
-      const data = await api<Stats>("/dashboard/stats");
+      const data = await api<Stats>("/dashboard/stats", { cacheMs: 15000, forceRefresh, timeoutMs: 45000 });
       setStats(data);
-    } catch {} finally {
+    } catch (e: any) {
+      setError(e?.message || "Dashboard could not load.");
+    } finally {
       setLoading(false); setRefreshing(false);
     }
   }, []);
@@ -50,7 +55,7 @@ export default function Dashboard() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing.xxl }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.brand} />}
       >
         <View style={styles.hero}>
           <Image source={{ uri: images.dashboardHero }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -71,6 +76,15 @@ export default function Dashboard() {
 
         {loading ? (
           <View style={styles.loader}><ActivityIndicator color={colors.brand} size="large" /></View>
+        ) : error ? (
+          <View style={styles.body}>
+            <View style={styles.errorCard}>
+              <Ionicons name="cloud-offline-outline" size={24} color={colors.error} />
+              <Text style={styles.errorTitle}>Dashboard unavailable</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
+            </View>
+          </View>
         ) : (
           <View style={styles.body}>
             <View style={styles.grid}>
@@ -148,4 +162,7 @@ const styles = StyleSheet.create({
   moveName: { fontFamily: fonts.textSemi, color: colors.onSurface, fontSize: 14 },
   moveSub: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 12, marginTop: 1 },
   muted: { fontFamily: fonts.text, color: colors.onSurfaceTertiary, fontSize: 14, paddingVertical: spacing.sm },
+  errorCard: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg },
+  errorTitle: { fontFamily: fonts.displaySemi, color: colors.onSurface, fontSize: 18, marginTop: spacing.sm },
+  errorText: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
 });

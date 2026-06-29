@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -18,9 +18,21 @@ export default function Logistics() {
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<EventT[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try { const data = await api<EventT[]>("/events"); setEvents(data); } catch {} finally { setLoading(false); }
+  const load = useCallback(async (forceRefresh = false) => {
+    setError("");
+    try {
+      const data = await api<EventT[]>("/events", { forceRefresh, timeoutMs: 45000 });
+      setEvents(data);
+    } catch (e: any) {
+      setError(e?.message || "Events could not load.");
+      setEvents([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -69,7 +81,17 @@ export default function Logistics() {
         <FlatList
           data={events} keyExtractor={(e) => e.id} renderItem={renderItem}
           contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<EmptyState icon="calendar-outline" title="No events scheduled" subtitle="Create an event to start assigning gear and tracking returns." />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.brand} />}
+          ListEmptyComponent={
+            error ? (
+              <View style={styles.errorState}>
+                <EmptyState icon="cloud-offline-outline" title="Events unavailable" subtitle={error} />
+                <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
+              </View>
+            ) : (
+              <EmptyState icon="calendar-outline" title="No events scheduled" subtitle="Create an event to start assigning gear and tracking returns." />
+            )
+          }
         />
       )}
 
@@ -98,4 +120,5 @@ const styles = StyleSheet.create({
   progressFill: { height: "100%", backgroundColor: colors.brand, borderRadius: 3 },
   progressLabel: { fontFamily: fonts.textMedium, fontSize: 12, color: colors.onSurfaceSecondary, marginTop: spacing.xs },
   cta: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
+  errorState: { paddingHorizontal: spacing.lg },
 });

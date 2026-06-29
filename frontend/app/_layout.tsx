@@ -6,6 +6,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/lib/auth";
@@ -16,14 +22,15 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [iconsLoaded, iconsError] = useIconFonts();
+  // FIX Bug 4: se reemplaza Rajdhani + IBM Plex Sans por una unica familia
+  // (Inter) cargada via @expo-google-fonts/inter en vez de archivos .ttf
+  // locales. Los nombres de fuente (Inter, Inter-Medium, etc.) deben
+  // actualizarse tambien en src/lib/theme.ts -> ver fonts{}.
   const [fontsLoaded, fontsError] = useFonts({
-    Rajdhani: require("../assets/fonts/Rajdhani-Regular.ttf"),
-    "Rajdhani-Medium": require("../assets/fonts/Rajdhani-Medium.ttf"),
-    "Rajdhani-SemiBold": require("../assets/fonts/Rajdhani-SemiBold.ttf"),
-    "Rajdhani-Bold": require("../assets/fonts/Rajdhani-Bold.ttf"),
-    IBMPlexSans: require("../assets/fonts/IBMPlexSans-Regular.ttf"),
-    "IBMPlexSans-Medium": require("../assets/fonts/IBMPlexSans-Medium.ttf"),
-    "IBMPlexSans-SemiBold": require("../assets/fonts/IBMPlexSans-SemiBold.ttf"),
+    Inter: Inter_400Regular,
+    "Inter-Medium": Inter_500Medium,
+    "Inter-SemiBold": Inter_600SemiBold,
+    "Inter-Bold": Inter_700Bold,
   });
 
   const ready = (iconsLoaded || iconsError) && (fontsLoaded || fontsError);

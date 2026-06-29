@@ -19,11 +19,12 @@ export default function EventForm() {
   const [loading, setLoading] = useState(false);
 
   const save = async () => {
+    if (loading) return;
     setError("");
     if (!name.trim()) { setError("Event name is required"); return; }
     setLoading(true);
     try {
-      await api("/events", { method: "POST", body: { name: name.trim(), venue: venue.trim(), date: date.trim(), notes: notes.trim() } });
+      await api("/events", { method: "POST", body: { name: name.trim(), venue: venue.trim(), date: date.trim(), notes: notes.trim() }, timeoutMs: 45000 });
       router.back();
     } catch (e: any) { setError(e.message || "Failed to create event"); } finally { setLoading(false); }
   };
