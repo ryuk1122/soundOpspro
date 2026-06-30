@@ -21,12 +21,12 @@ export default function EventForm() {
   const save = async () => {
     if (loading) return;
     setError("");
-    if (!name.trim()) { setError("Event name is required"); return; }
+    if (!name.trim()) { setError("El nombre del evento es obligatorio"); return; }
     setLoading(true);
     try {
       await api("/events", { method: "POST", body: { name: name.trim(), venue: venue.trim(), date: date.trim(), notes: notes.trim() }, timeoutMs: 45000 });
       router.back();
-    } catch (e: any) { setError(e.message || "Failed to create event"); } finally { setLoading(false); }
+    } catch (e: any) { setError(e.message || "No se pudo crear el evento"); } finally { setLoading(false); }
   };
 
   return (
@@ -35,20 +35,20 @@ export default function EventForm() {
         <Pressable testID="close-event-form" onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={26} color={colors.onSurface} />
         </Pressable>
-        <Text style={styles.headerTitle}>New Event</Text>
+        <Text style={styles.headerTitle}>Nuevo evento</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <TextField testID="event-name-input" label="Event Name" value={name} onChangeText={setName} placeholder="e.g. Summer Festival" />
-          <TextField testID="event-venue-input" label="Venue" value={venue} onChangeText={setVenue} placeholder="e.g. Main Stage Arena" />
-          <TextField testID="event-date-input" label="Date" value={date} onChangeText={setDate} placeholder="e.g. 2026-07-15" />
-          <TextField testID="event-notes-input" label="Notes" value={notes} onChangeText={setNotes} placeholder="Crew, call time, requirements..." multiline style={styles.notes} />
+          <TextField testID="event-name-input" label="Nombre del evento" value={name} onChangeText={setName} placeholder="Ej. Festival de verano" />
+          <TextField testID="event-venue-input" label="Lugar" value={venue} onChangeText={setVenue} placeholder="Ej. Escenario principal" />
+          <TextField testID="event-date-input" label="Fecha" value={date} onChangeText={setDate} placeholder="Ej. 2026-07-15" />
+          <TextField testID="event-notes-input" label="Notas" value={notes} onChangeText={setNotes} placeholder="Personal, hora de llamada, requerimientos..." multiline style={styles.notes} />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Button testID="save-event-button" title="Create Event" icon="checkmark" onPress={save} loading={loading} />
+          <Button testID="save-event-button" title="Crear evento" icon="checkmark" onPress={save} loading={loading} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

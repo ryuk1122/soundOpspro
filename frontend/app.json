@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Add photos of your audio gear to inventory"
+        "NSPhotoLibraryUsageDescription": "Agregar fotos de tus equipos al inventario",
+        "NSCameraUsageDescription": "Tomar fotos de tus equipos para el inventario"
       }
     },
     "android": {
@@ -23,7 +24,7 @@
         "backgroundColor": "#0F1115"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"]
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",
@@ -44,8 +45,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Add photos of your audio gear to inventory",
-          "cameraPermission": false,
+          "photosPermission": "Agregar fotos de tus equipos al inventario",
+          "cameraPermission": "Tomar fotos de tus equipos para el inventario",
           "microphonePermission": false
         }
       ]

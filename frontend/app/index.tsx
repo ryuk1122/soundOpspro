@@ -33,16 +33,16 @@ export default function Index() {
         <Ionicons name="pulse" size={34} color={colors.onBrand} />
       </View>
       <Text style={styles.name}>SoundOps Pro</Text>
-      <Text style={styles.subtitle}>Inventory, logistics and acoustic control</Text>
+      <Text style={styles.subtitle}>Inventario, logistica y control acustico</Text>
       <View style={styles.statusCard}>
         <ActivityIndicator color={colors.brand} />
         <View style={{ marginLeft: spacing.md, flex: 1 }}>
-          <Text style={styles.statusTitle}>Opening command center</Text>
-          <Text style={styles.statusText}>Checking session and secure storage</Text>
+          <Text style={styles.statusTitle}>Abriendo centro de control</Text>
+          <Text style={styles.statusText}>Verificando sesion y almacenamiento seguro</Text>
         </View>
       </View>
       <View style={styles.moduleRow}>
-        {["Gear", "Events", "SPL"].map((label) => (
+        {["Equipos", "Eventos", "SPL"].map((label) => (
           <View key={label} style={styles.modulePill}>
             <Text style={styles.moduleText}>{label}</Text>
           </View>

@@ -42,11 +42,28 @@ export const CATEGORIES = [
   "Speakers", "Amplifiers", "Mixers", "Microphones", "Cables", "Lighting", "Accessories",
 ];
 
+export const CATEGORY_LABELS: Record<string, string> = {
+  All: "Todo",
+  Speakers: "Bocinas",
+  Amplifiers: "Amplificadores",
+  Mixers: "Consolas",
+  Microphones: "Microfonos",
+  Cables: "Cables",
+  Lighting: "Iluminacion",
+  Accessories: "Accesorios",
+};
+
 export const CONDITIONS: { key: string; label: string; color: string }[] = [
-  { key: "operational", label: "Operational", color: colors.success },
-  { key: "maintenance", label: "Maintenance", color: colors.warning },
-  { key: "broken", label: "Out of Service", color: colors.error },
+  { key: "operational", label: "Operativo", color: colors.success },
+  { key: "maintenance", label: "Mantenimiento", color: colors.warning },
+  { key: "broken", label: "Fuera de servicio", color: colors.error },
 ];
+
+export const STATUS_LABELS: Record<string, string> = {
+  scheduled: "Programado",
+  active: "Activo",
+  completed: "Finalizado",
+};
 
 export const images = {
   dashboardHero: "https://images.pexels.com/photos/6605555/pexels-photo-6605555.jpeg",

@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/lib/api";
 import { Badge, Button, Chip, EmptyState } from "@/src/components/ui";
-import { CATEGORIES, CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
+import { CATEGORIES, CATEGORY_LABELS, CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
 
 type Item = {
   id: string; name: string; brand: string; category: string; condition: string;
@@ -41,7 +41,7 @@ export default function Inventory() {
     try {
       await fetchPage(cat, 0, true, forceRefresh);
     } catch (e: any) {
-      setError(e?.message || "Inventory could not load.");
+      setError(e?.message || "No se pudo cargar el inventario.");
       setItems([]);
       setHasMore(false);
     } finally {
@@ -55,7 +55,7 @@ export default function Inventory() {
   const loadMore = async () => {
     if (loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
-    try { await fetchPage(category, items.length, false); } catch (e: any) { setError(e?.message || "Could not load more equipment."); } finally { setLoadingMore(false); }
+    try { await fetchPage(category, items.length, false); } catch (e: any) { setError(e?.message || "No se pudo cargar mas equipo."); } finally { setLoadingMore(false); }
   };
 
   const renderItem = ({ item }: { item: Item }) => {
@@ -72,7 +72,7 @@ export default function Inventory() {
         )}
         <View style={{ flex: 1, marginLeft: spacing.md }}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.itemBrand} numberOfLines={1}>{item.brand || item.category}</Text>
+          <Text style={styles.itemBrand} numberOfLines={1}>{item.brand || CATEGORY_LABELS[item.category] || item.category}</Text>
           <View style={styles.itemMeta}><Badge label={cond.label} color={cond.color} /></View>
         </View>
         <View style={styles.stockBox}>
@@ -86,12 +86,12 @@ export default function Inventory() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.title}>Inventory</Text>
+        <Text style={styles.title}>Inventario</Text>
         <FlatList
           data={FILTERS} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(c) => c}
           contentContainerStyle={styles.chipRow}
           renderItem={({ item: cat }) => (
-            <Chip testID={`category-${cat}`} label={cat} active={category === cat} onPress={() => setCategory(cat)} />
+            <Chip testID={`category-${cat}`} label={CATEGORY_LABELS[cat] ?? cat} active={category === cat} onPress={() => setCategory(cat)} />
           )}
         />
       </View>
@@ -107,11 +107,11 @@ export default function Inventory() {
           ListEmptyComponent={
             error ? (
               <View style={styles.errorState}>
-                <EmptyState icon="cloud-offline-outline" title="Inventory unavailable" subtitle={error} />
-                <Button title="Retry" icon="refresh" variant="secondary" onPress={() => loadInitial(category, true)} />
+                <EmptyState icon="cloud-offline-outline" title="Inventario no disponible" subtitle={error} />
+                <Button title="Reintentar" icon="refresh" variant="secondary" onPress={() => loadInitial(category, true)} />
               </View>
             ) : (
-              <EmptyState icon="mic-outline" title="Inventory is empty" subtitle="Add your first piece of gear to start tracking stock and deployments." />
+              <EmptyState icon="mic-outline" title="Inventario vacio" subtitle="Agrega tu primer equipo para controlar stock, eventos y devoluciones." />
             )
           }
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.lg }} /> : null}
@@ -119,7 +119,7 @@ export default function Inventory() {
       )}
 
       <View style={[styles.cta, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <Button testID="add-equipment-button" title="Add Equipment" icon="add" onPress={() => router.push("/equipment/new")} />
+        <Button testID="add-equipment-button" title="Agregar equipo" icon="add" onPress={() => router.push("/equipment/new")} />
       </View>
     </View>
   );

@@ -3,6 +3,7 @@ import { storage } from "@/src/utils/storage";
 const DEFAULT_BACKEND_URL = "https://api-production-45a2.up.railway.app";
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || DEFAULT_BACKEND_URL;
 const BASE = `${BACKEND_URL.replace(/\/$/, "")}/api`;
+export const API_BASE = BASE;
 const TOKEN_KEY = "soundops_token";
 
 export async function getToken(): Promise<string | null> {
@@ -52,6 +53,21 @@ const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<any>>();
 
 const DEFAULT_TIMEOUT = 15000; // cubre el cold start de Railway free tier (~5-10s)
+
+const ERROR_TEXTS: Record<string, string> = {
+  "Invalid credentials": "Sesion vencida. Inicia sesion de nuevo.",
+  "Email already registered": "Ese correo ya esta registrado.",
+  "Incorrect email or password": "Correo o contrasena incorrectos.",
+  "Equipment not found": "Equipo no encontrado.",
+  "Event not found": "Evento no encontrado.",
+  "Assignment not found": "Asignacion no encontrada.",
+  "Not enough units available": "No hay suficientes unidades disponibles.",
+  "Invalid return quantity": "Cantidad de devolucion invalida.",
+};
+
+function translateError(message: string) {
+  return ERROR_TEXTS[message] ?? message;
+}
 
 function cacheKey(path: string) {
   return path;
@@ -131,7 +147,7 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
 
     if (!res.ok) {
       const detail = data?.detail || `Request failed (${res.status})`;
-      throw new Error(typeof detail === "string" ? detail : "Request failed");
+      throw new Error(typeof detail === "string" ? translateError(detail) : "La solicitud fallo");
     }
 
     if (isGet && cacheMs > 0) {

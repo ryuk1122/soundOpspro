@@ -27,13 +27,13 @@ export default function Login() {
 
   const submit = async () => {
     setError("");
-    if (!email || !password) { setError("Enter your email and password"); return; }
+    if (!email || !password) { setError("Ingresa tu correo y contrasena"); return; }
     setLoading(true);
     try {
       await login(email.trim(), password);
       router.replace("/(tabs)");
     } catch (e: any) {
-      setError(e.message || "Login failed");
+      setError(e.message || "No se pudo iniciar sesion");
     } finally {
       setLoading(false);
     }
@@ -57,28 +57,28 @@ export default function Login() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Command Center</Text>
-          <Text style={styles.subtitle}>Control inventory, event deployments and returns from one workspace.</Text>
+          <Text style={styles.title}>Centro de control</Text>
+          <Text style={styles.subtitle}>Controla inventario, eventos, envios y devoluciones desde un solo lugar.</Text>
 
           <View style={styles.liveRow}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Railway API online</Text>
+            <Text style={styles.liveText}>API Railway en linea</Text>
             <Text style={styles.liveDivider}>/</Text>
-            <Text style={styles.liveText}>Firebase synced</Text>
+            <Text style={styles.liveText}>Firebase sincronizado</Text>
           </View>
 
-          <TextField testID="login-email-input" label="Email" value={email} onChangeText={setEmail}
-            autoCapitalize="none" keyboardType="email-address" placeholder="you@studio.com" />
-          <TextField testID="login-password-input" label="Password" value={password} onChangeText={setPassword}
-            secureTextEntry placeholder="••••••••" />
+          <TextField testID="login-email-input" label="Correo" value={email} onChangeText={setEmail}
+            autoCapitalize="none" keyboardType="email-address" placeholder="tucorreo@estudio.com" />
+          <TextField testID="login-password-input" label="Contrasena" value={password} onChangeText={setPassword}
+            secureTextEntry placeholder="********" />
 
           {error ? <Text testID="login-error" style={styles.error}>{error}</Text> : null}
 
-          <Button testID="login-submit-button" title="Sign In" onPress={submit} loading={loading} icon="log-in-outline" />
+          <Button testID="login-submit-button" title="Entrar" onPress={submit} loading={loading} icon="log-in-outline" />
 
           <Pressable testID="go-register" onPress={() => router.push("/(auth)/register")} style={styles.switchRow}>
             <Text style={styles.switchText}>
-              New here? <Text style={styles.switchLink}>Create an account</Text>
+              Nuevo aqui? <Text style={styles.switchLink}>Crear cuenta</Text>
             </Text>
           </Pressable>
         </ScrollView>
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   hero: { height: 260, justifyContent: "flex-start" },
   brandRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg },
   logo: { width: 38, height: 38, borderRadius: 10, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center", marginRight: spacing.sm },
-  brandName: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.onSurface, letterSpacing: 0.5 },
+  brandName: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.onSurface, letterSpacing: 0 },
   form: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
   title: { fontFamily: fonts.displayBold, fontSize: 32, color: colors.onSurface },
   subtitle: { fontFamily: fonts.text, fontSize: 15, color: colors.onSurfaceSecondary, marginBottom: spacing.xl },

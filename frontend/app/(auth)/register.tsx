@@ -22,14 +22,14 @@ export default function Register() {
 
   const submit = async () => {
     setError("");
-    if (!name || !email || !password) { setError("All fields are required"); return; }
-    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (!name || !email || !password) { setError("Todos los campos son obligatorios"); return; }
+    if (password.length < 6) { setError("La contrasena debe tener al menos 6 caracteres"); return; }
     setLoading(true);
     try {
       await register(email.trim(), name.trim(), password);
       router.replace("/(tabs)");
     } catch (e: any) {
-      setError(e.message || "Registration failed");
+      setError(e.message || "No se pudo crear la cuenta");
     } finally {
       setLoading(false);
     }
@@ -43,22 +43,22 @@ export default function Register() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Set up your professional audio workspace.</Text>
+          <Text style={styles.title}>Crear cuenta</Text>
+          <Text style={styles.subtitle}>Configura tu espacio de trabajo de audio profesional.</Text>
 
-          <TextField testID="register-name-input" label="Full Name" value={name} onChangeText={setName} placeholder="Alex Sound" />
-          <TextField testID="register-email-input" label="Email" value={email} onChangeText={setEmail}
-            autoCapitalize="none" keyboardType="email-address" placeholder="you@studio.com" />
-          <TextField testID="register-password-input" label="Password" value={password} onChangeText={setPassword}
-            secureTextEntry placeholder="At least 6 characters" />
+          <TextField testID="register-name-input" label="Nombre completo" value={name} onChangeText={setName} placeholder="Alex Sonido" />
+          <TextField testID="register-email-input" label="Correo" value={email} onChangeText={setEmail}
+            autoCapitalize="none" keyboardType="email-address" placeholder="tucorreo@estudio.com" />
+          <TextField testID="register-password-input" label="Contrasena" value={password} onChangeText={setPassword}
+            secureTextEntry placeholder="Minimo 6 caracteres" />
 
           {error ? <Text testID="register-error" style={styles.error}>{error}</Text> : null}
 
-          <Button testID="register-submit-button" title="Create Account" onPress={submit} loading={loading} icon="person-add-outline" />
+          <Button testID="register-submit-button" title="Crear cuenta" onPress={submit} loading={loading} icon="person-add-outline" />
 
           <Pressable testID="go-login" onPress={() => router.back()} style={styles.switchRow}>
             <Text style={styles.switchText}>
-              Already registered? <Text style={styles.switchLink}>Sign in</Text>
+              Ya tienes cuenta? <Text style={styles.switchLink}>Entrar</Text>
             </Text>
           </Pressable>
         </ScrollView>

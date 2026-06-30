@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui";
 import { useAuth } from "@/src/lib/auth";
+import { downloadReport } from "@/src/lib/exports";
 import { colors, fonts, images, radius, spacing } from "@/src/lib/theme";
 
 type Stats = {
@@ -28,6 +29,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState("");
 
   const load = useCallback(async (forceRefresh = false) => {
     setError("");
@@ -35,7 +38,7 @@ export default function Dashboard() {
       const data = await api<Stats>("/dashboard/stats", { cacheMs: 15000, forceRefresh, timeoutMs: 45000 });
       setStats(data);
     } catch (e: any) {
-      setError(e?.message || "Dashboard could not load.");
+      setError(e?.message || "No se pudo cargar el panel.");
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -44,11 +47,29 @@ export default function Dashboard() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const metrics = [
-    { label: "Gear Models", value: stats?.total_gear ?? 0, icon: "albums-outline" as const },
-    { label: "Total Units", value: stats?.total_units ?? 0, icon: "cube-outline" as const },
-    { label: "Deployed", value: stats?.deployed_units ?? 0, icon: "rocket-outline" as const },
-    { label: "Active Events", value: stats?.active_events ?? 0, icon: "calendar-outline" as const },
+    { label: "Modelos", value: stats?.total_gear ?? 0, icon: "albums-outline" as const },
+    { label: "Unidades", value: stats?.total_units ?? 0, icon: "cube-outline" as const },
+    { label: "En eventos", value: stats?.deployed_units ?? 0, icon: "rocket-outline" as const },
+    { label: "Eventos activos", value: stats?.active_events ?? 0, icon: "calendar-outline" as const },
   ];
+
+  const exportFile = async (kind: "xlsx" | "pdf") => {
+    setExportError("");
+    setExporting(kind);
+    try {
+      await downloadReport(kind);
+    } catch (e: any) {
+      setExportError(e?.message || "No se pudo exportar el archivo.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const reasonLabel = (reason: string) => (
+    reason === "Out of stock" ? "Sin unidades disponibles"
+    : reason === "Needs service" ? "Requiere mantenimiento"
+    : reason
+  );
 
   return (
     <View style={styles.container}>
@@ -63,14 +84,14 @@ export default function Dashboard() {
           <View style={[styles.heroContent, { paddingTop: insets.top + spacing.lg }]}>
             <View style={styles.heroTopRow}>
               <View>
-                <Text style={styles.greeting}>Welcome back</Text>
-                <Text style={styles.userName}>{user?.name ?? "Engineer"}</Text>
+                <Text style={styles.greeting}>Bienvenido</Text>
+                <Text style={styles.userName}>{user?.name ?? "Ingeniero"}</Text>
               </View>
               <Pressable testID="signout-button" onPress={signOut} style={styles.iconBtn}>
                 <Ionicons name="log-out-outline" size={20} color={colors.onSurface} />
               </Pressable>
             </View>
-            <Text style={styles.heroTitle}>Live Operations</Text>
+            <Text style={styles.heroTitle}>Operaciones en vivo</Text>
           </View>
         </View>
 
@@ -80,9 +101,9 @@ export default function Dashboard() {
           <View style={styles.body}>
             <View style={styles.errorCard}>
               <Ionicons name="cloud-offline-outline" size={24} color={colors.error} />
-              <Text style={styles.errorTitle}>Dashboard unavailable</Text>
+              <Text style={styles.errorTitle}>Panel no disponible</Text>
               <Text style={styles.errorText}>{error}</Text>
-              <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
+              <Button title="Reintentar" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
             </View>
           </View>
         ) : (
@@ -97,8 +118,18 @@ export default function Dashboard() {
               ))}
             </View>
 
+            <View style={styles.exportCard}>
+              <Text style={styles.exportTitle}>Exportar reportes</Text>
+              <Text style={styles.exportText}>Inventario, eventos y asignaciones en un solo archivo.</Text>
+              <View style={styles.exportButtons}>
+                <Button title="Excel" icon="document-text-outline" variant="secondary" style={styles.exportButton} loading={exporting === "xlsx"} disabled={!!exporting} onPress={() => exportFile("xlsx")} />
+                <Button title="PDF" icon="document-outline" variant="secondary" style={styles.exportButton} loading={exporting === "pdf"} disabled={!!exporting} onPress={() => exportFile("pdf")} />
+              </View>
+              {exportError ? <Text style={styles.exportError}>{exportError}</Text> : null}
+            </View>
+
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Stock Alerts</Text>
+              <Text style={styles.sectionTitle}>Alertas de inventario</Text>
               <View style={styles.countPill}><Text style={styles.countPillText}>{stats?.stock_alerts.length ?? 0}</Text></View>
             </View>
             {stats && stats.stock_alerts.length > 0 ? (
@@ -107,14 +138,14 @@ export default function Dashboard() {
                   <Ionicons name="warning" size={18} color={colors.warning} />
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
                     <Text style={styles.alertName}>{a.name}</Text>
-                    <Text style={styles.alertReason}>{a.reason}</Text>
+                    <Text style={styles.alertReason}>{reasonLabel(a.reason)}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceTertiary} />
                 </Pressable>
               ))
-            ) : (<Text style={styles.muted}>All gear operational and in stock.</Text>)}
+            ) : (<Text style={styles.muted}>Todo el equipo esta operativo y con stock.</Text>)}
 
-            <View style={styles.sectionHeaderRow}><Text style={styles.sectionTitle}>Recent Movements</Text></View>
+            <View style={styles.sectionHeaderRow}><Text style={styles.sectionTitle}>Movimientos recientes</Text></View>
             {stats && stats.recent_movements.length > 0 ? (
               stats.recent_movements.map((mv) => (
                 <View key={mv.id} style={styles.moveRow}>
@@ -122,12 +153,12 @@ export default function Dashboard() {
                     <Ionicons name={mv.type === "out" ? "arrow-up" : "arrow-down"} size={16} color={mv.type === "out" ? colors.brand : colors.success} />
                   </View>
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
-                    <Text style={styles.moveName}>{mv.quantity}× {mv.equipment_name}</Text>
-                    <Text style={styles.moveSub}>{mv.type === "out" ? "Deployed to" : "Returned from"} {mv.event_name}</Text>
+                    <Text style={styles.moveName}>{mv.quantity}x {mv.equipment_name}</Text>
+                    <Text style={styles.moveSub}>{mv.type === "out" ? "Enviado a" : "Devuelto desde"} {mv.event_name}</Text>
                   </View>
                 </View>
               ))
-            ) : (<Text style={styles.muted}>No movements logged yet.</Text>)}
+            ) : (<Text style={styles.muted}>Todavia no hay movimientos registrados.</Text>)}
           </View>
         )}
       </ScrollView>
@@ -143,13 +174,19 @@ const styles = StyleSheet.create({
   greeting: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 14 },
   userName: { fontFamily: fonts.displaySemi, color: colors.onSurface, fontSize: 22 },
   iconBtn: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
-  heroTitle: { fontFamily: fonts.displayBold, color: colors.onSurface, fontSize: 34, letterSpacing: 0.5 },
+  heroTitle: { fontFamily: fonts.displayBold, color: colors.onSurface, fontSize: 34, letterSpacing: 0 },
   loader: { paddingVertical: spacing.xxxl },
   body: { paddingHorizontal: spacing.lg },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, marginTop: spacing.sm },
   metricCard: { width: "47.6%", flexGrow: 1, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg },
   metricValue: { fontFamily: fonts.displayBold, fontSize: 34, color: colors.onSurface, marginTop: spacing.sm },
   metricLabel: { fontFamily: fonts.textMedium, fontSize: 12, color: colors.onSurfaceSecondary, textTransform: "uppercase", letterSpacing: 0.8 },
+  exportCard: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.lg },
+  exportTitle: { fontFamily: fonts.displaySemi, color: colors.onSurface, fontSize: 18 },
+  exportText: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 19, marginTop: 2, marginBottom: spacing.md },
+  exportButtons: { flexDirection: "row", gap: spacing.sm },
+  exportButton: { flex: 1 },
+  exportError: { fontFamily: fonts.textMedium, color: colors.error, fontSize: 13, marginTop: spacing.sm },
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", marginTop: spacing.xl, marginBottom: spacing.md },
   sectionTitle: { fontFamily: fonts.displaySemi, fontSize: 20, color: colors.onSurface },
   countPill: { marginLeft: spacing.sm, backgroundColor: colors.brandTertiary, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },

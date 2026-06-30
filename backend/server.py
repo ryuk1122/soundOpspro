@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -9,6 +10,7 @@ import uuid
 import json
 import base64
 import asyncio
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
@@ -25,6 +27,13 @@ from firebase_admin import credentials, firestore
 # Cloudinary
 import cloudinary
 import cloudinary.uploader
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from reportlab.lib import colors as pdf_colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -99,6 +108,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("soundops")
 
 CATEGORIES = ["Speakers", "Amplifiers", "Mixers", "Microphones", "Cables", "Lighting", "Accessories"]
+CATEGORY_LABELS = {
+    "Speakers": "Bocinas",
+    "Amplifiers": "Amplificadores",
+    "Mixers": "Consolas",
+    "Microphones": "Microfonos",
+    "Cables": "Cables",
+    "Lighting": "Iluminacion",
+    "Accessories": "Accesorios",
+}
+CONDITION_LABELS = {
+    "operational": "Operativo",
+    "maintenance": "Mantenimiento",
+    "broken": "Fuera de servicio",
+}
+STATUS_LABELS = {
+    "scheduled": "Programado",
+    "active": "Activo",
+    "completed": "Finalizado",
+}
 
 
 def now_utc() -> datetime:
@@ -145,6 +173,197 @@ def fs_query_to_list(query) -> list:
 def sort_created_desc(rows: list) -> list:
     fallback = datetime.min.replace(tzinfo=timezone.utc)
     return sorted(rows, key=lambda row: row.get("created_at") or fallback, reverse=True)
+
+
+def fmt_dt(value) -> str:
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return str(value or "")
+
+
+def fmt_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def event_totals(event: dict) -> tuple[int, int, int]:
+    total = sum(int(a.get("quantity", 0)) for a in event.get("assignments", []))
+    returned = sum(int(a.get("returned", 0)) for a in event.get("assignments", []))
+    return total, returned, total - returned
+
+
+def fetch_owner_report_data(owner_id: str) -> tuple[list, list]:
+    equipment = fs_query_to_list(db.collection("equipment").where("owner_id", "==", owner_id))
+    events = fs_query_to_list(db.collection("events").where("owner_id", "==", owner_id))
+    return sort_created_desc(equipment), sort_created_desc(events)
+
+
+def style_excel_sheet(ws) -> None:
+    header_fill = PatternFill(fill_type="solid", fgColor="FF9F0A")
+    header_font = Font(bold=True, color="000000")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+    for column_cells in ws.columns:
+        width = max(len(str(cell.value or "")) for cell in column_cells)
+        ws.column_dimensions[column_cells[0].column_letter].width = min(max(width + 2, 12), 48)
+    ws.freeze_panes = "A2"
+
+
+def build_excel_report(equipment: list, events: list) -> BytesIO:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventario"
+    ws.append([
+        "Nombre", "Marca", "Categoria", "Estado", "Cantidad total", "Disponible",
+        "En eventos", "Notas", "Imagen", "Creado",
+    ])
+    for item in equipment:
+        total = int(item.get("quantity", 0))
+        available = int(item.get("quantity_available", 0))
+        ws.append([
+            fmt_text(item.get("name")),
+            fmt_text(item.get("brand")),
+            CATEGORY_LABELS.get(item.get("category"), item.get("category", "")),
+            CONDITION_LABELS.get(item.get("condition"), item.get("condition", "")),
+            total,
+            available,
+            total - available,
+            fmt_text(item.get("notes")),
+            fmt_text(item.get("image")),
+            fmt_dt(item.get("created_at")),
+        ])
+    style_excel_sheet(ws)
+
+    ev_ws = wb.create_sheet("Eventos")
+    ev_ws.append([
+        "Evento", "Lugar", "Fecha", "Estado", "Total asignado", "Devuelto",
+        "Pendiente", "Notas", "Creado",
+    ])
+    for event in events:
+        total, returned, pending = event_totals(event)
+        ev_ws.append([
+            fmt_text(event.get("name")),
+            fmt_text(event.get("venue")),
+            fmt_text(event.get("date")),
+            STATUS_LABELS.get(event.get("status"), event.get("status", "")),
+            total,
+            returned,
+            pending,
+            fmt_text(event.get("notes")),
+            fmt_dt(event.get("created_at")),
+        ])
+    style_excel_sheet(ev_ws)
+
+    assign_ws = wb.create_sheet("Asignaciones")
+    assign_ws.append(["Evento", "Estado evento", "Equipo", "Cantidad", "Devuelto", "Pendiente"])
+    for event in events:
+        for assignment in event.get("assignments", []):
+            qty = int(assignment.get("quantity", 0))
+            returned = int(assignment.get("returned", 0))
+            assign_ws.append([
+                fmt_text(event.get("name")),
+                STATUS_LABELS.get(event.get("status"), event.get("status", "")),
+                fmt_text(assignment.get("equipment_name")),
+                qty,
+                returned,
+                qty - returned,
+            ])
+    style_excel_sheet(assign_ws)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+def build_pdf_report(equipment: list, events: list) -> BytesIO:
+    output = BytesIO()
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=landscape(letter),
+        leftMargin=24,
+        rightMargin=24,
+        topMargin=24,
+        bottomMargin=24,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "SoundOpsTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        textColor=pdf_colors.HexColor("#0F1115"),
+        fontSize=20,
+        leading=24,
+    )
+    small_style = ParagraphStyle("Small", parent=styles["BodyText"], fontSize=8, leading=10)
+    body_style = ParagraphStyle("Body", parent=styles["BodyText"], fontSize=9, leading=11)
+
+    story = [
+        Paragraph("Reporte SoundOps Pro", title_style),
+        Paragraph(f"Generado: {fmt_dt(now_utc())}", small_style),
+        Spacer(1, 12),
+        Paragraph("Inventario", styles["Heading2"]),
+    ]
+
+    inventory_rows = [["Equipo", "Categoria", "Estado", "Total", "Disponible", "En eventos"]]
+    for item in equipment:
+        total = int(item.get("quantity", 0))
+        available = int(item.get("quantity_available", 0))
+        inventory_rows.append([
+            Paragraph(fmt_text(item.get("name")), body_style),
+            CATEGORY_LABELS.get(item.get("category"), item.get("category", "")),
+            CONDITION_LABELS.get(item.get("condition"), item.get("condition", "")),
+            total,
+            available,
+            total - available,
+        ])
+    if len(inventory_rows) == 1:
+        inventory_rows.append(["Sin equipos", "", "", "", "", ""])
+    story.append(Table(inventory_rows, repeatRows=1, colWidths=[230, 110, 110, 55, 70, 70]))
+    story[-1].setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), pdf_colors.HexColor("#FF9F0A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pdf_colors.black),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.25, pdf_colors.HexColor("#C9CED6")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    story.extend([PageBreak(), Paragraph("Eventos y asignaciones", styles["Heading2"])])
+    event_rows = [["Evento", "Lugar/fecha", "Estado", "Asignado", "Devuelto", "Pendiente", "Equipos"]]
+    for event in events:
+        total, returned, pending = event_totals(event)
+        gear = ", ".join(
+            f"{a.get('equipment_name', '')} ({a.get('returned', 0)}/{a.get('quantity', 0)})"
+            for a in event.get("assignments", [])
+        )
+        event_rows.append([
+            Paragraph(fmt_text(event.get("name")), body_style),
+            Paragraph(f"{fmt_text(event.get('venue'))}<br/>{fmt_text(event.get('date'))}", body_style),
+            STATUS_LABELS.get(event.get("status"), event.get("status", "")),
+            total,
+            returned,
+            pending,
+            Paragraph(gear or "Sin equipos asignados", body_style),
+        ])
+    if len(event_rows) == 1:
+        event_rows.append(["Sin eventos", "", "", "", "", "", ""])
+    story.append(Table(event_rows, repeatRows=1, colWidths=[150, 135, 80, 55, 55, 60, 220]))
+    story[-1].setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), pdf_colors.HexColor("#FF9F0A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pdf_colors.black),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.25, pdf_colors.HexColor("#C9CED6")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    doc.build(story)
+    output.seek(0)
+    return output
 
 
 # ✅ Helper para correr queries Firestore en paralelo desde async
@@ -440,6 +659,22 @@ async def set_event_status(event_id: str, body: StatusIn, user: dict = Depends(g
     return Event(**data)
 
 
+@api_router.delete("/events/{event_id}")
+async def delete_event(event_id: str, user: dict = Depends(get_current_user)):
+    doc_ref = db.collection("events").document(event_id)
+    doc = doc_ref.get()
+    data = fs_doc_to_dict(doc)
+    if not data or data.get("owner_id") != user["id"]:
+        raise HTTPException(status_code=404, detail="Evento no encontrado")
+    if data.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Solo puedes eliminar eventos finalizados")
+    _, _, pending = event_totals(data)
+    if pending > 0:
+        raise HTTPException(status_code=400, detail="Devuelve todos los equipos antes de eliminar el evento")
+    doc_ref.delete()
+    return {"ok": True}
+
+
 @api_router.post("/events/{event_id}/assign", response_model=Event)
 async def assign_gear(event_id: str, body: AssignIn, user: dict = Depends(get_current_user)):
     event_ref = db.collection("events").document(event_id)
@@ -522,6 +757,29 @@ async def return_gear(event_id: str, body: AssignIn, user: dict = Depends(get_cu
 # ---------------------------------------------------------------------------
 # Dashboard — ✅ FIX: queries en paralelo (era ~5x más lento en serie)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Exports
+# ---------------------------------------------------------------------------
+@api_router.get("/exports/report.xlsx")
+async def export_excel(user: dict = Depends(get_current_user)):
+    equipment, events = fetch_owner_report_data(user["id"])
+    output = build_excel_report(equipment, events)
+    headers = {"Content-Disposition": 'attachment; filename="soundops-reporte.xlsx"'}
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
+
+
+@api_router.get("/exports/report.pdf")
+async def export_pdf(user: dict = Depends(get_current_user)):
+    equipment, events = fetch_owner_report_data(user["id"])
+    output = build_pdf_report(equipment, events)
+    headers = {"Content-Disposition": 'attachment; filename="soundops-reporte.pdf"'}
+    return StreamingResponse(output, media_type="application/pdf", headers=headers)
+
+
 @api_router.get("/dashboard/stats")
 async def dashboard_stats(user: dict = Depends(get_current_user)):
     uid = user["id"]

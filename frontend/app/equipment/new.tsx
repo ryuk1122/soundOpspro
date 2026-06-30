@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/lib/api";
 import { Button, Chip, TextField } from "@/src/components/ui";
-import { CATEGORIES, CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
+import { CATEGORIES, CATEGORY_LABELS, CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
 
 export default function EquipmentForm() {
   const router = useRouter();
@@ -25,7 +25,7 @@ export default function EquipmentForm() {
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [permBlocked, setPermBlocked] = useState(false);
+  const [permissionBlocked, setPermissionBlocked] = useState(false);
 
   useEffect(() => {
     if (!editing) return;
@@ -44,30 +44,50 @@ export default function EquipmentForm() {
     })();
   }, [editing, id]);
 
-  const pickImage = async () => {
-    setPermBlocked(false);
-    const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
-    let status = perm.status;
-    if (status !== "granted") {
-      if (!perm.canAskAgain) { setPermBlocked(true); return; }
-      const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      status = req.status;
-      if (status !== "granted") { if (!req.canAskAgain) setPermBlocked(true); return; }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
-    });
+  const setPickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (!result.canceled && result.assets[0]?.base64) {
       setImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
     }
   };
 
+  const pickImage = async () => {
+    setPermissionBlocked(false);
+    const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+    let status = perm.status;
+    if (status !== "granted") {
+      if (!perm.canAskAgain) { setPermissionBlocked(true); return; }
+      const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      status = req.status;
+      if (status !== "granted") { if (!req.canAskAgain) setPermissionBlocked(true); return; }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
+    });
+    setPickedImage(result);
+  };
+
+  const takePhoto = async () => {
+    setPermissionBlocked(false);
+    const perm = await ImagePicker.getCameraPermissionsAsync();
+    let status = perm.status;
+    if (status !== "granted") {
+      if (!perm.canAskAgain) { setPermissionBlocked(true); return; }
+      const req = await ImagePicker.requestCameraPermissionsAsync();
+      status = req.status;
+      if (status !== "granted") { if (!req.canAskAgain) setPermissionBlocked(true); return; }
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true, aspect: [1, 1], quality: 0.55, base64: true,
+    });
+    setPickedImage(result);
+  };
+
   const save = async () => {
     if (loading) return;
     setError("");
-    if (!name.trim()) { setError("Equipment name is required"); return; }
+    if (!name.trim()) { setError("El nombre del equipo es obligatorio"); return; }
     const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty < 1) { setError("Quantity must be at least 1"); return; }
+    if (isNaN(qty) || qty < 1) { setError("La cantidad debe ser al menos 1"); return; }
     setLoading(true);
     const body = { name: name.trim(), brand: brand.trim(), category, condition, quantity: qty, notes: notes.trim(), image };
     try {
@@ -77,7 +97,7 @@ export default function EquipmentForm() {
       else await api("/equipment", { method: "POST", body, timeoutMs: 90000 });
       router.back();
     } catch (e: any) {
-      setError(e?.message || "Failed to save");
+      setError(e?.message || "No se pudo guardar");
     } finally {
       setLoading(false);
     }
@@ -89,7 +109,7 @@ export default function EquipmentForm() {
         <Pressable testID="close-form" onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={26} color={colors.onSurface} />
         </Pressable>
-        <Text style={styles.headerTitle}>{editing ? "Edit Gear" : "Add Gear"}</Text>
+        <Text style={styles.headerTitle}>{editing ? "Editar equipo" : "Agregar equipo"}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -101,37 +121,44 @@ export default function EquipmentForm() {
             ) : (
               <View style={styles.imagePlaceholder}>
                 <Ionicons name="camera-outline" size={28} color={colors.brand} />
-                <Text style={styles.imageHint}>Add a photo</Text>
+                <Text style={styles.imageHint}>Agrega una foto</Text>
               </View>
             )}
           </Pressable>
-          {permBlocked && (
+          <View style={styles.photoActions}>
+            <Button testID="take-photo" title="Camara" icon="camera-outline" variant="secondary" style={styles.photoButton} onPress={takePhoto} />
+            <Button testID="pick-image-library" title="Galeria" icon="images-outline" variant="secondary" style={styles.photoButton} onPress={pickImage} />
+          </View>
+          {image ? (
+            <Button testID="remove-photo" title="Quitar foto" icon="close-circle-outline" variant="ghost" onPress={() => setImage(null)} />
+          ) : null}
+          {permissionBlocked && (
             <View style={styles.permBox}>
-              <Text style={styles.permText}>Photo access is blocked. Enable it in Settings to add an image.</Text>
-              <Button testID="open-settings" title="Open Settings" variant="secondary" onPress={() => Linking.openSettings()} />
+              <Text style={styles.permText}>El permiso de fotos o camara esta bloqueado. Activalo en Ajustes para agregar imagenes.</Text>
+              <Button testID="open-settings" title="Abrir ajustes" variant="secondary" onPress={() => Linking.openSettings()} />
             </View>
           )}
 
-          <TextField testID="name-input" label="Name" value={name} onChangeText={setName} placeholder="e.g. QSC K12.2" />
-          <TextField testID="brand-input" label="Brand" value={brand} onChangeText={setBrand} placeholder="e.g. QSC" />
+          <TextField testID="name-input" label="Nombre" value={name} onChangeText={setName} placeholder="Ej. QSC K12.2" />
+          <TextField testID="brand-input" label="Marca" value={brand} onChangeText={setBrand} placeholder="Ej. QSC" />
 
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>Categoria</Text>
           <View style={styles.wrapRow}>
-            {CATEGORIES.map((c) => (<Chip key={c} testID={`cat-${c}`} label={c} active={category === c} onPress={() => setCategory(c)} />))}
+            {CATEGORIES.map((c) => (<Chip key={c} testID={`cat-${c}`} label={CATEGORY_LABELS[c] ?? c} active={category === c} onPress={() => setCategory(c)} />))}
           </View>
 
-          <Text style={styles.label}>Condition</Text>
+          <Text style={styles.label}>Estado</Text>
           <View style={styles.wrapRow}>
             {CONDITIONS.map((c) => (<Chip key={c.key} testID={`cond-${c.key}`} label={c.label} active={condition === c.key} onPress={() => setCondition(c.key)} />))}
           </View>
 
           <View style={{ height: spacing.lg }} />
-          <TextField testID="quantity-input" label="Quantity" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
-          <TextField testID="notes-input" label="Notes" value={notes} onChangeText={setNotes} placeholder="Serial, accessories, condition details..." multiline style={styles.notes} />
+          <TextField testID="quantity-input" label="Cantidad" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
+          <TextField testID="notes-input" label="Notas" value={notes} onChangeText={setNotes} placeholder="Serie, accesorios, detalles del estado..." multiline style={styles.notes} />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Button testID="save-equipment-button" title={editing ? "Save Changes" : "Add to Inventory"} icon="checkmark" onPress={save} loading={loading} />
+          <Button testID="save-equipment-button" title={editing ? "Guardar cambios" : "Agregar al inventario"} icon="checkmark" onPress={save} loading={loading} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -149,6 +176,8 @@ const styles = StyleSheet.create({
   imagePreview: { width: "100%", height: "100%" },
   imagePlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
   imageHint: { fontFamily: fonts.textMedium, color: colors.onSurfaceSecondary, fontSize: 13, marginTop: spacing.sm },
+  photoActions: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  photoButton: { flex: 1 },
   permBox: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, gap: spacing.sm },
   permText: { fontFamily: fonts.text, color: colors.onSurfaceSecondary, fontSize: 13 },
   label: { fontFamily: fonts.textMedium, color: colors.onSurfaceSecondary, fontSize: 12, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 1 },

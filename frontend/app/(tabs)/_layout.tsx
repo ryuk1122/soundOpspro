@@ -19,19 +19,19 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{
-        title: "Dashboard",
+        title: "Panel",
         tabBarIcon: ({ color, size }) => <Ionicons name="pulse" size={size} color={color} />,
       }} />
       <Tabs.Screen name="inventory" options={{
-        title: "Inventory",
+        title: "Inventario",
         tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="speaker" size={size} color={color} />,
       }} />
       <Tabs.Screen name="calculator" options={{
-        title: "Calculator",
+        title: "Calculadora",
         tabBarIcon: ({ color, size }) => <Ionicons name="calculator" size={size} color={color} />,
       }} />
       <Tabs.Screen name="logistics" options={{
-        title: "Logistics",
+        title: "Logistica",
         tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="truck-fast" size={size} color={color} />,
       }} />
     </Tabs>

@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/lib/api";
 import { Badge, Button } from "@/src/components/ui";
-import { CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
+import { CATEGORY_LABELS, CONDITIONS, colors, fonts, radius, spacing } from "@/src/lib/theme";
 
 export default function EquipmentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +26,7 @@ export default function EquipmentDetail() {
       const data = await api<any>(`/equipment/${id}`, { timeoutMs: 45000 });
       setItem(data);
     } catch (e: any) {
-      setError(e?.message || "Equipment could not load.");
+      setError(e?.message || "No se pudo cargar el equipo.");
     } finally {
       setLoading(false);
     }
@@ -36,7 +36,7 @@ export default function EquipmentDetail() {
   const remove = async () => {
     setDeleting(true);
     try { await api(`/equipment/${id}`, { method: "DELETE" }); router.back(); }
-    catch (e: any) { setError(e?.message || "Could not delete equipment."); setDeleting(false); setConfirm(false); }
+    catch (e: any) { setError(e?.message || "No se pudo eliminar el equipo."); setDeleting(false); setConfirm(false); }
   };
 
   if (loading) {
@@ -46,9 +46,9 @@ export default function EquipmentDetail() {
   if (!item) {
     return (
       <View style={[styles.loader, { paddingHorizontal: spacing.lg }]}>
-        <Text style={styles.errorTitle}>Equipment unavailable</Text>
-        <Text style={styles.errorText}>{error || "Could not load this equipment."}</Text>
-        <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(); }} />
+        <Text style={styles.errorTitle}>Equipo no disponible</Text>
+        <Text style={styles.errorText}>{error || "No se pudo cargar este equipo."}</Text>
+        <Button title="Reintentar" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(); }} />
       </View>
     );
   }
@@ -56,10 +56,10 @@ export default function EquipmentDetail() {
   const cond = CONDITIONS.find((c) => c.key === item.condition) ?? CONDITIONS[0];
   const deployed = item.quantity - item.quantity_available;
   const specs = [
-    { label: "Total Units", value: item.quantity },
-    { label: "Available", value: item.quantity_available },
-    { label: "Deployed", value: deployed },
-    { label: "Category", value: item.category },
+    { label: "Total", value: item.quantity },
+    { label: "Disponible", value: item.quantity_available },
+    { label: "En eventos", value: deployed },
+    { label: "Categoria", value: CATEGORY_LABELS[item.category] ?? item.category },
   ];
 
   return (
@@ -80,7 +80,7 @@ export default function EquipmentDetail() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.brand}>{item.brand || item.category}</Text>
+          <Text style={styles.brand}>{item.brand || CATEGORY_LABELS[item.category] || item.category}</Text>
           <Text style={styles.name}>{item.name}</Text>
           {error ? <Text style={styles.inlineError}>{error}</Text> : null}
           <View style={{ flexDirection: "row", marginTop: spacing.sm }}><Badge label={cond.label} color={cond.color} /></View>
@@ -95,25 +95,25 @@ export default function EquipmentDetail() {
           </View>
 
           {item.notes ? (<>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <Text style={styles.sectionTitle}>Notas</Text>
             <Text style={styles.notes}>{item.notes}</Text>
           </>) : null}
         </View>
       </ScrollView>
 
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <Button testID="edit-button" title="Edit" icon="create-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push(`/equipment/new?id=${id}`)} />
-        <Button testID="delete-button" title="Delete" icon="trash-outline" variant="danger" style={{ flex: 1 }} onPress={() => setConfirm(true)} />
+        <Button testID="edit-button" title="Editar" icon="create-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push(`/equipment/new?id=${id}`)} />
+        <Button testID="delete-button" title="Eliminar" icon="trash-outline" variant="danger" style={{ flex: 1 }} onPress={() => setConfirm(true)} />
       </View>
 
       <Modal visible={confirm} transparent animationType="fade" onRequestClose={() => setConfirm(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Delete this gear?</Text>
-            <Text style={styles.modalText}>{item.name} will be permanently removed from inventory.</Text>
+            <Text style={styles.modalTitle}>Eliminar este equipo?</Text>
+            <Text style={styles.modalText}>{item.name} se eliminara permanentemente del inventario.</Text>
             <View style={styles.modalActions}>
-              <Button testID="cancel-delete" title="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => setConfirm(false)} />
-              <Button testID="confirm-delete" title="Delete" variant="danger" style={{ flex: 1 }} loading={deleting} onPress={remove} />
+              <Button testID="cancel-delete" title="Cancelar" variant="ghost" style={{ flex: 1 }} onPress={() => setConfirm(false)} />
+              <Button testID="confirm-delete" title="Eliminar" variant="danger" style={{ flex: 1 }} loading={deleting} onPress={remove} />
             </View>
           </View>
         </View>

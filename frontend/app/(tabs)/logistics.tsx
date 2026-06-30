@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/lib/api";
 import { Badge, Button, EmptyState } from "@/src/components/ui";
-import { colors, fonts, images, radius, spacing } from "@/src/lib/theme";
+import { colors, fonts, images, radius, spacing, STATUS_LABELS } from "@/src/lib/theme";
 
 type EventT = { id: string; name: string; venue: string; date: string; status: string; assignments: { quantity: number; returned: number }[] };
 const STATUS_COLOR: Record<string, string> = { scheduled: colors.warning, active: colors.brand, completed: colors.success };
@@ -27,7 +27,7 @@ export default function Logistics() {
       const data = await api<EventT[]>("/events", { forceRefresh, timeoutMs: 45000 });
       setEvents(data);
     } catch (e: any) {
-      setError(e?.message || "Events could not load.");
+      setError(e?.message || "No se pudieron cargar los eventos.");
       setEvents([]);
     } finally {
       setLoading(false);
@@ -47,18 +47,18 @@ export default function Logistics() {
             <Text style={styles.eventName} numberOfLines={1}>{item.name}</Text>
             <View style={styles.metaRow}>
               <Ionicons name="location-outline" size={13} color={colors.onSurfaceTertiary} />
-              <Text style={styles.metaText} numberOfLines={1}>{item.venue || "No venue"}</Text>
+              <Text style={styles.metaText} numberOfLines={1}>{item.venue || "Sin lugar"}</Text>
               {!!item.date && (<>
                 <Ionicons name="calendar-outline" size={13} color={colors.onSurfaceTertiary} style={{ marginLeft: spacing.sm }} />
                 <Text style={styles.metaText}>{item.date}</Text>
               </>)}
             </View>
           </View>
-          <Badge label={item.status} color={STATUS_COLOR[item.status] ?? colors.brand} />
+          <Badge label={STATUS_LABELS[item.status] ?? item.status} color={STATUS_COLOR[item.status] ?? colors.brand} />
         </View>
         <View style={styles.progressRow}>
           <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${pct}%` }]} /></View>
-          <Text style={styles.progressLabel}>{returned}/{total} returned</Text>
+          <Text style={styles.progressLabel}>{returned}/{total} devueltos</Text>
         </View>
       </Pressable>
     );
@@ -70,8 +70,8 @@ export default function Logistics() {
         <Image source={{ uri: images.logisticsBg }} style={StyleSheet.absoluteFill} contentFit="cover" />
         <LinearGradient colors={["rgba(15,17,21,0.4)", "rgba(15,17,21,0.85)", colors.surface]} style={StyleSheet.absoluteFill} />
         <View style={[styles.heroContent, { paddingTop: insets.top + spacing.lg }]}>
-          <Text style={styles.heroTitle}>Logistics</Text>
-          <Text style={styles.heroSub}>Track deployments and returns per event.</Text>
+          <Text style={styles.heroTitle}>Logistica</Text>
+          <Text style={styles.heroSub}>Controla envios y devoluciones por evento.</Text>
         </View>
       </View>
 
@@ -85,18 +85,18 @@ export default function Logistics() {
           ListEmptyComponent={
             error ? (
               <View style={styles.errorState}>
-                <EmptyState icon="cloud-offline-outline" title="Events unavailable" subtitle={error} />
-                <Button title="Retry" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
+                <EmptyState icon="cloud-offline-outline" title="Eventos no disponibles" subtitle={error} />
+                <Button title="Reintentar" icon="refresh" variant="secondary" onPress={() => { setLoading(true); load(true); }} />
               </View>
             ) : (
-              <EmptyState icon="calendar-outline" title="No events scheduled" subtitle="Create an event to start assigning gear and tracking returns." />
+              <EmptyState icon="calendar-outline" title="No hay eventos" subtitle="Crea un evento para asignar equipos y controlar devoluciones." />
             )
           }
         />
       )}
 
       <View style={[styles.cta, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <Button testID="create-event-button" title="Create Event" icon="add" onPress={() => router.push("/event/new")} />
+        <Button testID="create-event-button" title="Crear evento" icon="add" onPress={() => router.push("/event/new")} />
       </View>
     </View>
   );
