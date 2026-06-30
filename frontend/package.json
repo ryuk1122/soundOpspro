@@ -15,7 +15,8 @@
     "build:android:preview": "eas build -p android --profile preview",
     "build:web": "expo export --platform web",
     "type-check": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "assets:brand": "node scripts/generate-brand-assets.js"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
